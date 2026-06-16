@@ -1,0 +1,4 @@
+/gocontainer
+*.tar
+.claude/
+.DS_Store
