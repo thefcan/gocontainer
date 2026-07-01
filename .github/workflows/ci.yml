@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build (Linux runtime)
+        run: go build -o gocontainer .
+
+      - name: Build cross-platform stub (macOS)
+        run: GOOS=darwin GOARCH=arm64 go build -o /dev/null .
+
+      - name: Smoke test — real namespace isolation
+        run: |
+          mkdir -p rootfs
+          cid=$(docker create alpine:latest)
+          docker export "$cid" | sudo tar -x -C rootfs
+          docker rm "$cid" >/dev/null
+          out=$(sudo ROOTFS="$PWD/rootfs" ./gocontainer run /bin/hostname)
+          echo "$out"
+          echo "$out" | grep -qx container
