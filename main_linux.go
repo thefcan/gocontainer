@@ -68,22 +68,17 @@ func run() {
 // root filesystem, mounts /proc, then replaces itself with the requested command
 // via exec — so the command runs as PID 1, exactly like a real container's init.
 func child() {
-	rootfs := os.Getenv("ROOTFS")
-	if rootfs == "" {
-		rootfs = "/rootfs"
-	}
+	rootfs := resolveRootfs(os.Getenv("ROOTFS"))
 	fmt.Printf("[child]  isolated as pid %d, rootfs %s\n", os.Getpid(), rootfs)
 
-	must(syscall.Sethostname([]byte("container")))
+	must(syscall.Sethostname([]byte(containerHostname)))
 	must(syscall.Chroot(rootfs))
 	must(syscall.Chdir("/"))
 	must(syscall.Mount("proc", "/proc", "proc", 0, ""))
 
 	// Give bare command names (e.g. "sh") a sane PATH to resolve against inside
 	// the new root filesystem.
-	if os.Getenv("PATH") == "" {
-		os.Setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
-	}
+	os.Setenv("PATH", resolvePath(os.Getenv("PATH")))
 
 	path, err := exec.LookPath(os.Args[2])
 	must(err)
